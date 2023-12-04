@@ -35,10 +35,6 @@ public:
             cerr << "SQL error in table_info: " << sqlite3_errmsg(db) << endl;
         }
     }
-    // Function to add a column
-    void addColumn(const string& columnName) {
-        columns.push_back(columnName);
-    }
 
     // Function to add a row
     void addRow(const map<string, string>& rowData) {
@@ -180,12 +176,39 @@ bool tableExists(sqlite3 *db, const string& tableName) {
 }
 
 void addTable(sqlite3 *db) {
-    string tableName;
+    string tableName, columnName, sql;
+    vector<string> columns;
+
     cout << "Enter new table name: ";
     cin >> tableName;
 
-    string sql = "CREATE TABLE IF NOT EXISTS " + tableName + " (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, date TEXT);";
- // Define your columns here
+    cout << "Enter column names (type 'done' to finish): \n";
+    while (true) {
+        cout << "Column" << columns.size() + 1 << ": ";
+        cin >> columnName;
+
+        if (columnName == "done") {
+            break;
+        }
+
+        // Assuming all columns are of type TEXT for simplicity
+        // Modify this part if you need different data types
+        columns.push_back(columnName + " TEXT");
+    }
+
+    if (columns.empty()) {
+        cout << "No columns specified. Table creation aborted.\n";
+        return;
+    }
+
+    sql = "CREATE TABLE IF NOT EXISTS " + tableName + " (";
+    for (const auto& col : columns) {
+        sql += col + ", ";
+    }
+    sql.pop_back(); // Remove last space
+    sql.pop_back(); // Remove last comma
+    sql += ");";
+
     char *errMsg = nullptr;
     if (sqlite3_exec(db, sql.c_str(), nullptr, 0, &errMsg) != SQLITE_OK) {
         cerr << "SQL error: " << errMsg << endl;
