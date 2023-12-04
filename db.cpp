@@ -284,6 +284,34 @@ void addColumnToTable(sqlite3 *db, Table& table, const string& tableName) {
     } else {
         cout << "Column " << newColumnName << " added to table " << table.getName() << " successfully.\n";
         table.refreshColumns(); // Refresh the columns after adding a new one
+
+        sql = "SELECT id FROM " + table.getName();
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                int id = sqlite3_column_int(stmt, 0);
+                string newValue;
+                cout << "Enter value for " << newColumnName << " for Row " << id << ": ";
+                cin >> newValue; // Assuming a single word input. For multi-word input use getline(cin, newValue);
+
+                // Update the row with the new value for the new column
+                string updateSql = "UPDATE " + table.getName() + " SET " + newColumnName + " = ? WHERE id = ?";
+                sqlite3_stmt *updateStmt;
+                if (sqlite3_prepare_v2(db, updateSql.c_str(), -1, &updateStmt, nullptr) == SQLITE_OK) {
+                    sqlite3_bind_text(updateStmt, 1, newValue.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_int(updateStmt, 2, id);
+                    if (sqlite3_step(updateStmt) != SQLITE_DONE) {
+                        cerr << "SQL error in updating row: " << sqlite3_errmsg(db) << endl;
+                    }
+                    sqlite3_finalize(updateStmt);
+                } else {
+                    cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+                }
+            }
+            sqlite3_finalize(stmt);
+        } else {
+            cerr << "SQL error in SELECT ID: " << sqlite3_errmsg(db) << endl;
+        }
     }
 }
 
