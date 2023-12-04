@@ -10,7 +10,7 @@ A C++ application for managing contacts and custom tables, leveraging SQLite for
    ```bash
    g++ -std=c++17 -o YourProgram db.cpp -lsqlite3
    ```
-2. **Execute the Binary:
+2. **Execute the Binary**:
    ```bash
    ./YourProgram
    ```
