@@ -48,7 +48,7 @@ Execute the Binary:
 Feel free to fork, modify, and send pull requests to contribute to this project!
 
 ## License 📜
-This project is open-sourced under the [MIT License](LICENSE.md).
+This project is open-sourced under the [MIT License](LICENSE).
 
 ## Contact 📫
 For queries and suggestions, feel free to open an issue.
