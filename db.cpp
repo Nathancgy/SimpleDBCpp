@@ -362,37 +362,18 @@ void createContactsTable(sqlite3* db) {
     }
 }
 
-int main() {
-    sqlite3 *db;
-    if (sqlite3_open("database.db", &db)) {
-        cerr << "Error opening database: " << sqlite3_errmsg(db) << endl;
-        return 1;
-    }
-    createContactsTable(db); 
-    Table table("", db);
-    int choice;
-
-    ensureTablesDirectory();
+void contactOperations(sqlite3 *db) {
+    int contactChoice;
     do {
-        cout << "\nDirections\n";
+        cout << "\nContact Operations\n";
         cout << "1. Add Contact\n";
         cout << "2. View Contacts\n";
         cout << "3. Delete Contact\n";
-        cout << "4. Add Table\n";
-        cout << "5. Open Table\n";
-        cout << "6. Delete Table\n";
-        cout << "7. Exit\n";
+        cout << "4. Return to Main Menu\n";
         cout << "Enter your choice: ";
-        cin >> choice;
-        if (cin.fail()) {
-            cin.clear(); // Clears any error flags.
-            // Ignore any input in the buffer up to the newline character or a large number of characters.
-            cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
-            cout << "Invalid input. Please enter a number.\n";
-            continue; // Skip the rest of the loop iteration.
-        }
+        cin >> contactChoice;
 
-        switch (choice) {
+        switch (contactChoice) {
             case 1:
                 addContact(db);
                 break;
@@ -403,20 +384,78 @@ int main() {
                 deleteContact(db);
                 break;
             case 4:
-                addTable(db);
                 break;
-            case 5:
-                openTable(db, table);
+            default:
+                cout << "Invalid choice. Please try again.\n";
+        }
+    } while (contactChoice != 4);
+}
+
+int main() {
+    sqlite3 *db;
+    if (sqlite3_open("database.db", &db)) {
+        cerr << "Error opening database: " << sqlite3_errmsg(db) << endl;
+        return 1;
+    }
+    createContactsTable(db); 
+    Table table("", db);
+    int mainChoice, tableChoice;
+
+    ensureTablesDirectory();
+    do {
+        cout << "\nMain Menu\n";
+        cout << "1. Contact Operations\n";
+        cout << "2. Table Operations\n";
+        cout << "3. Exit\n";
+        cout << "Enter your choice: ";
+        cin >> mainChoice;
+
+        if (cin.fail()) {
+            cin.clear(); 
+            cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
+            cout << "Invalid input. Please enter a number.\n";
+            continue;
+        }
+
+        switch (mainChoice) {
+            case 1:
+                contactOperations(db);
                 break;
-            case 6:
-                deleteTable(db);
+            case 2:
+                do {
+                    cout << "\nTable Operations\n";
+                    cout << "1. Add Table\n";
+                    cout << "2. Open Table\n";
+                    cout << "3. Delete Table\n";
+                    cout << "4. Return to Main Menu\n";
+                    cout << "Enter your choice: ";
+                    cin >> tableChoice;
+
+                    switch (tableChoice) {
+                        case 1:
+                            addTable(db);
+                            break;
+                        case 2:
+                            openTable(db, table);
+                            break;
+                        case 3:
+                            deleteTable(db);
+                            break;
+                        case 4:
+                            break;
+                        default:
+                            cout << "Invalid choice. Please try again.\n";
+                    }
+                } while (tableChoice != 4);
                 break;
-            case 7:
+            case 3:
                 cout << "Exiting...\n";
                 break;
-            // ... [Rest of the switch cases]
+            default:
+                cout << "Invalid choice. Please try again.\n";
         }
-    } while (choice != 7);
+    } while (mainChoice != 3);
+
     sqlite3_close(db);
     return 0;
 }
