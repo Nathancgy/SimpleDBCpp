@@ -155,7 +155,21 @@ public:
         return columns;
     }
 
-    // More functions (like deleteRow, updateRow, etc.) can be added here
+    void refreshColumns() {
+        columns.clear();
+        string sql = "PRAGMA table_info(" + tableName + ");";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                string colName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)); // Column name is in the second column
+                columns.push_back(colName);
+            }
+            sqlite3_finalize(stmt);
+        } else {
+            cerr << "SQL error in table_info: " << sqlite3_errmsg(db) << endl;
+        }
+    }
+
 };
 
 void manageTable(Table&, sqlite3*);
@@ -254,7 +268,7 @@ void deleteTable(sqlite3 *db) {
     }
 }
 
-void addColumnToTable(sqlite3 *db, const string& tableName) {
+void addColumnToTable(sqlite3 *db, Table& table, const string& tableName) {
     string newColumnName;
 
     cout << "Enter the name of the new column: ";
@@ -268,7 +282,8 @@ void addColumnToTable(sqlite3 *db, const string& tableName) {
         cerr << "SQL error: " << errMsg << endl;
         sqlite3_free(errMsg);
     } else {
-        cout << "Column " << newColumnName << " added to table " << tableName << " successfully.\n";
+        cout << "Column " << newColumnName << " added to table " << table.getName() << " successfully.\n";
+        table.refreshColumns(); // Refresh the columns after adding a new one
     }
 }
 
@@ -293,7 +308,7 @@ void manageTable(Table& table, sqlite3* db) {
 
         switch (choice) {
             case 1: {
-                addColumnToTable(db, table.getName());
+                addColumnToTable(db, table, table.getName());
                 break;
             }
             case 2: {
