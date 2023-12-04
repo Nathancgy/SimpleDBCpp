@@ -374,7 +374,7 @@ int main() {
 
     ensureTablesDirectory();
     do {
-        cout << "\nContact Management System\n";
+        cout << "\nDirections\n";
         cout << "1. Add Contact\n";
         cout << "2. View Contacts\n";
         cout << "3. Delete Contact\n";
