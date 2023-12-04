@@ -69,8 +69,6 @@ public:
         }
         sql += ");";
 
-        cout << "Debug SQL: " << sql << endl;
-
         sqlite3_stmt *stmt;
         if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
             cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
@@ -219,7 +217,7 @@ void addTable(sqlite3 *db) {
         return;
     }
 
-    sql = "CREATE TABLE IF NOT EXISTS " + tableName + " (";
+    sql = "CREATE TABLE IF NOT EXISTS " + tableName + " (id INTEGER PRIMARY KEY AUTOINCREMENT, ";
     for (const auto& col : columns) {
         sql += col + ", ";
     }
