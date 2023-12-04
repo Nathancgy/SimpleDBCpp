@@ -167,6 +167,18 @@ void ensureTablesDirectory() {
     }
 }
 
+bool tableExists(sqlite3 *db, const string& tableName) {
+    string sql = "SELECT name FROM sqlite_master WHERE type='table' AND name='" + tableName + "';";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+        return false;
+    }
+    bool exists = sqlite3_step(stmt) == SQLITE_ROW;
+    sqlite3_finalize(stmt);
+    return exists;
+}
+
 void addTable(sqlite3 *db) {
     string tableName;
     cout << "Enter new table name: ";
@@ -189,8 +201,13 @@ void openTable(sqlite3 *db, Table& table) {
     cout << "Enter table name to open: ";
     cin >> tableName;
 
-    // Here, simply prepare the Table object with the given table name and database connection
+    if (!tableExists(db, tableName)) {
+        cout << "Table " << tableName << " does not exist." << endl;
+        return;
+    }
+
     table = Table(tableName, db);
+    cout << "Opened table " << tableName << endl;
     manageTable(table);
 }
 
