@@ -1,6 +1,6 @@
 # SimpleDBCpp 📖
 
-A C++ application for managing contacts and custom tables, leveraging SQLite for efficient data storage and retrieval.
+A C++ application for managing contacts and custom tables (future functions will be added), leveraging SQLite for efficient data storage and retrieval.
 
 ## How to Run 🚀
 
