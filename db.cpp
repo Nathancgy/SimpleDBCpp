@@ -8,8 +8,6 @@
 #include <sqlite3.h>
 namespace fs = std::filesystem;
 
-// g++ -std=c++17 -o YourProgram test.cpp
-
 using namespace std;
 
 class Table {
