@@ -168,6 +168,7 @@ void openTable(Table& table) {
     if (fs::exists(tablePath)) {
         table.loadFromFile(tablePath.string());
         manageTable(table); // Call manageTable to perform operations on the opened table
+        table.saveToFile(tablePath.string());
     } else {
         cout << "Cannot find table " << tableName << ".\n";
     }
