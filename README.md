@@ -36,10 +36,11 @@ A C++ application for managing contacts and custom tables, leveraging SQLite for
 - View table contents in a neatly formatted console output.
 
 ## Demonstration 👀
-<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/eg1.png?raw=true" alt="alt text" width="30%">
-<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/eg2.png?raw=true" alt="alt text" width="30%">
-<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/eg3.png?raw=true" alt="alt text" width="30%">
-<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/eg.png?raw=true" alt="alt text" width="30%">
+<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/demo1.png?raw=true" alt="alt text" width="30%">
+<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/demo2.png?raw=true" alt="alt text" width="30%">
+<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/demo3.png?raw=true" alt="alt text" width="30%">
+<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/demo4.png?raw=true" alt="alt text" width="30%">
+<img src="https://github.com/Nathancgy/SimpleDBCpp/blob/main/img/demo5.png?raw=true" alt="alt text" width="30%">
 
 ---
 
