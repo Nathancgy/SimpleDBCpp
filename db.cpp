@@ -5,6 +5,7 @@
 #include <sstream>
 #include <map>
 #include <filesystem>
+#include <sqlite3.h>
 namespace fs = std::filesystem;
 
 // g++ -std=c++17 -o YourProgram test.cpp
@@ -12,10 +13,28 @@ namespace fs = std::filesystem;
 using namespace std;
 
 class Table {
+    string tableName;
+    sqlite3 *db;
     vector<string> columns;
-    vector<map<string, string>> rows;
 
 public:
+    Table(const string& name, sqlite3* database) : tableName(name), db(database) {
+        if (tableName.empty()) {
+            cerr << "Table name is empty." << endl;
+            return;
+        }
+        string sql = "PRAGMA table_info(" + tableName + ");";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                string colName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)); // Column name is in the second column
+                columns.push_back(colName);
+            }
+            sqlite3_finalize(stmt);
+        } else {
+            cerr << "SQL error in table_info: " << sqlite3_errmsg(db) << endl;
+        }
+    }
     // Function to add a column
     void addColumn(const string& columnName) {
         columns.push_back(columnName);
@@ -23,13 +42,61 @@ public:
 
     // Function to add a row
     void addRow(const map<string, string>& rowData) {
-        rows.push_back(rowData);
+        if (columns.empty()) {
+            cerr << "Error: No columns defined for the table." << endl;
+            return;
+        }
+
+        string sql = "INSERT INTO " + tableName + " (";
+        for (const auto& col : columns) {
+            if (col != "id") { // Skip the 'id' column
+                sql += col + ", ";
+            }
+        }
+        if (sql.back() == ' ') {
+            sql.pop_back(); // Remove last space
+            sql.pop_back(); // Remove last comma
+        }
+        sql += ") VALUES (";
+        for (size_t i = 0; i < columns.size(); ++i) {
+            if (columns[i] != "id") {
+                sql += "?, ";
+            }
+        }
+        if (sql.back() == ' ') {
+            sql.pop_back(); // Remove last space
+            sql.pop_back(); // Remove last comma
+        }
+        sql += ");";
+
+        cout << "Debug SQL: " << sql << endl;
+
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+            return;
+        }
+
+        int bindIndex = 1;
+        for (const auto& col : columns) {
+            if (col != "id") {
+                sqlite3_bind_text(stmt, bindIndex++, rowData.at(col).c_str(), -1, SQLITE_TRANSIENT);
+            }
+        }
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << "SQL error in step: " << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_finalize(stmt);
     }
 
     // Function to display the table
     void display() {
-        if (columns.empty() || rows.empty()) {
-            cout << "The table is empty." << endl;
+        string sql = "SELECT * FROM " + tableName;
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
             return;
         }
 
@@ -40,92 +107,52 @@ public:
         cout << endl;
 
         // Display rows
-        for (const auto& row : rows) {
-            for (const auto& col : columns) {
-                auto it = row.find(col);
-                if (it != row.end()) {
-                    cout << it->second << "\t";
-                } else {
-                    cout << "N/A\t"; // Not available or missing data
-                }
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            for (int i = 0; i < sqlite3_column_count(stmt); ++i) {
+                cout << string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, i))) << "\t";
             }
             cout << endl;
         }
+
+        sqlite3_finalize(stmt);
     }
 
     void deleteRow(const string& key, const string& value) {
-        rows.erase(
-            remove_if(rows.begin(), rows.end(),
-                    [key, value](const auto& row) { return row.at(key) == value; }),
-            rows.end());
-    }
+        string sql = "DELETE FROM " + tableName + " WHERE " + key + " = ?";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+            return;
+        }
 
+        sqlite3_bind_text(stmt, 1, value.c_str(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << "SQL error in step: " << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_finalize(stmt);
+    }
     // Function to update a row based on a key
     void updateRow(const string& key, const string& oldValue, const string& newValue) {
-        for (auto& row : rows) {
-            if (row[key] == oldValue) {
-                row[key] = newValue;
-            }
+        string sql = "UPDATE " + tableName + " SET " + key + " = ? WHERE " + key + " = ?";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+            return;
         }
+
+        sqlite3_bind_text(stmt, 1, newValue.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, oldValue.c_str(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << "SQL error in step: " << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_finalize(stmt);
     }
     const vector<string>& getColumns() const {
         return columns;
-    }
-
-    void saveToFile(const string& filename) {
-        ofstream file(filename);
-        if (!file.is_open()) {
-            cerr << "Error opening file for writing: " << filename << endl;
-            return;
-        }
-
-        // Write column names
-        for (const auto& col : columns) {
-            file << col << ",";
-        }
-        file << "\n";
-
-        // Write rows
-        for (const auto& row : rows) {
-            for (const auto& col : columns) {
-                file << row.at(col) << ",";
-            }
-            file << "\n";
-        }
-        file.close();
-    }
-
-    // Function to load the table from a file
-    void loadFromFile(const string& filename) {
-        ifstream file(filename);
-        if (!file.is_open()) {
-            cerr << "Error opening file for reading: " << filename << endl;
-            return;
-        }
-
-        string line, cell;
-        // Read column names
-        if (getline(file, line)) {
-            stringstream lineStream(line);
-            while (getline(lineStream, cell, ',')) {
-                columns.push_back(cell);
-            }
-        }
-
-        // Read rows
-        while (getline(file, line)) {
-            stringstream lineStream(line);
-            map<string, string> rowData;
-            size_t colIndex = 0;
-            while (getline(lineStream, cell, ',') && colIndex < columns.size()) {
-                rowData[columns[colIndex]] = cell;
-                colIndex++;
-            }
-            if (colIndex == columns.size()) { // Only add complete rows
-                rows.push_back(rowData);
-            }
-        }
-        file.close();
     }
 
     // More functions (like deleteRow, updateRow, etc.) can be added here
@@ -140,55 +167,46 @@ void ensureTablesDirectory() {
     }
 }
 
-// Function to add a new table
-void addTable() {
-    ensureTablesDirectory();
+void addTable(sqlite3 *db) {
     string tableName;
     cout << "Enter new table name: ";
     cin >> tableName;
 
-    // Construct the file path for the new table
-    fs::path tablePath = fs::path("tables") / (tableName + ".txt");
-
-    // Create and immediately close the file to ensure it exists
-    ofstream(tablePath).close();
-    cout << "Table " << tableName << " added.\n";
+    string sql = "CREATE TABLE IF NOT EXISTS " + tableName + " (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, date TEXT);";
+ // Define your columns here
+    char *errMsg = nullptr;
+    if (sqlite3_exec(db, sql.c_str(), nullptr, 0, &errMsg) != SQLITE_OK) {
+        cerr << "SQL error: " << errMsg << endl;
+        sqlite3_free(errMsg);
+    } else {
+        cout << "Table " << tableName << " created successfully.\n";
+    }
 }
 
 // Function to open an existing table
-void openTable(Table& table) {
-    ensureTablesDirectory();
+void openTable(sqlite3 *db, Table& table) {
     string tableName;
     cout << "Enter table name to open: ";
     cin >> tableName;
 
-    // Construct the file path for the table
-    fs::path tablePath = fs::path("tables") / (tableName + ".txt");
-
-    if (fs::exists(tablePath)) {
-        table.loadFromFile(tablePath.string());
-        manageTable(table); // Call manageTable to perform operations on the opened table
-        table.saveToFile(tablePath.string());
-    } else {
-        cout << "Cannot find table " << tableName << ".\n";
-    }
+    // Here, simply prepare the Table object with the given table name and database connection
+    table = Table(tableName, db);
+    manageTable(table);
 }
 
 // Function to delete an existing table
-void deleteTable() {
-    ensureTablesDirectory();
+void deleteTable(sqlite3 *db) {
     string tableName;
     cout << "Enter table name to delete: ";
     cin >> tableName;
 
-    // Construct the file path for the table
-    fs::path tablePath = fs::path("tables") / (tableName + ".txt");
-
-    if (fs::exists(tablePath)) {
-        fs::remove(tablePath);
-        cout << "Table " << tableName << " deleted.\n";
+    string sql = "DROP TABLE IF EXISTS " + tableName;
+    char *errMsg = nullptr;
+    if (sqlite3_exec(db, sql.c_str(), nullptr, 0, &errMsg) != SQLITE_OK) {
+        cerr << "SQL error: " << errMsg << endl;
+        sqlite3_free(errMsg);
     } else {
-        cout << "Cannot find table " << tableName << ".\n";
+        cout << "Table " << tableName << " deleted successfully.\n";
     }
 }
 
@@ -196,7 +214,7 @@ void manageTable(Table& table) {
     int choice;
     do {
         cout << "\nTable Management\n";
-        cout << "1. Add Column\n";
+        cout << "1. Add Column\n";  // Note: SQLite does not support adding columns to existing tables easily
         cout << "2. Add Row\n";
         cout << "3. Delete Row\n";
         cout << "4. Update Row\n";
@@ -204,6 +222,7 @@ void manageTable(Table& table) {
         cout << "6. Return to Main Menu\n";
         cout << "Enter your choice: ";
         cin >> choice;
+
         if (cin.fail()) {
             cin.clear(); // Clear error flags
             cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Ignore the rest of the line
@@ -212,19 +231,21 @@ void manageTable(Table& table) {
 
         switch (choice) {
             case 1: {
-                string columnName;
-                cout << "Enter column name: ";
-                cin >> columnName;
-                table.addColumn(columnName);
+                // SQLite does not support adding columns to existing tables easily.
+                // If you need this functionality, consider designing your database schema to be more flexible
+                // or recreate the table with the new column.
+                cout << "Adding columns is not supported in this version.\n";
                 break;
             }
             case 2: {
                 map<string, string> rowData;
                 string value;
                 for (const auto& col : table.getColumns()) {
-                    cout << "Enter value for " << col << ": ";
-                    cin >> value;
-                    rowData[col] = value;
+                    if (col != "id") {
+                        cout << "Enter value for " << col << ": ";
+                        cin >> value;
+                        rowData[col] = value;
+                    }
                 }
                 table.addRow(rowData);
                 break;
@@ -253,22 +274,15 @@ void manageTable(Table& table) {
                 table.display();
                 break;
             case 6:
-                return;
+                return; // Exit the manageTable function
             default:
                 cout << "Invalid choice. Please try again.\n";
         }
     } while (choice != 6);
 }
 
-void addContact() {
-    ofstream file;
-    file.open("contacts.txt", ios::app); // Open in append mode
 
-    if (!file) {
-        cerr << "Error in opening file!" << endl;
-        return;
-    }
-
+void addContact(sqlite3 *db) {
     string name, phone;
     cout << "Enter name: ";
     cin.ignore();  // To flush the newline character out of the buffer
@@ -276,79 +290,88 @@ void addContact() {
     cout << "Enter phone number: ";
     getline(cin, phone);
 
-    file << name << "," << phone << endl; // Write to file
+    string sql = "INSERT INTO contacts (name, phone) VALUES (?, ?);";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+        return;
+    }
 
-    file.close();
+    sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, phone.c_str(), -1, SQLITE_TRANSIENT);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "SQL error in step: " << sqlite3_errmsg(db) << endl;
+    }
+
+    sqlite3_finalize(stmt);
     cout << "Contact added successfully!\n";
 }
 
-void viewContacts() {
-    ifstream file;
-    file.open("contacts.txt");
 
-    if (!file) {
-        cerr << "Error in opening file!" << endl;
+void viewContacts(sqlite3 *db) {
+    string sql = "SELECT name, phone FROM contacts;";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
         return;
     }
 
-    string line;
     cout << "Contacts:\n";
-    while (getline(file, line)) {
-        size_t pos = line.find(',');
-        string name = line.substr(0, pos);
-        string phone = line.substr(pos + 1);
-
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        string name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+        string phone = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
         cout << "Name: " << name << ", Phone: " << phone << endl;
     }
 
-    file.close();
+    sqlite3_finalize(stmt);
 }
-void deleteContact() {
-    ifstream file;
-    file.open("contacts.txt");
 
-    if (!file) {
-        cerr << "Error in opening file!" << endl;
-        return;
-    }
-
-    string line, nameToDelete;
-    vector<string> contacts;
+void deleteContact(sqlite3 *db) {
+    string nameToDelete;
     cout << "Enter the name of the contact to delete: ";
     cin.ignore(); // To flush the newline character out of the buffer
     getline(cin, nameToDelete);
 
-    bool found = false;
-    while (getline(file, line)) {
-        if (line.substr(0, line.find(',')) != nameToDelete) {
-            contacts.push_back(line);
-            break;
-        } else {
-            found = true;
-            break;
-        }
+    string sql = "DELETE FROM contacts WHERE name = ?";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "SQL error in prepare: " << sqlite3_errmsg(db) << endl;
+        return;
     }
 
-    file.close();
+    sqlite3_bind_text(stmt, 1, nameToDelete.c_str(), -1, SQLITE_TRANSIENT);
 
-    if (found) {
-        ofstream outFile;
-        outFile.open("contacts.txt", ios::trunc); // Open in truncate mode
-
-        for (const auto& contact : contacts) {
-            outFile << contact << endl;
-        }
-
-        outFile.close();
-        cout << "Contact deleted successfully!\n";
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "SQL error in step: " << sqlite3_errmsg(db) << endl;
     } else {
-        cout << "Contact not found!\n";
+        cout << "Contact deleted successfully!\n";
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+void createContactsTable(sqlite3* db) {
+    string sql = "CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT);";
+    char* errMsg = nullptr;
+    if (sqlite3_exec(db, sql.c_str(), nullptr, 0, &errMsg) != SQLITE_OK) {
+        cerr << "SQL error: " << errMsg << endl;
+        sqlite3_free(errMsg);
+    } else {
+        cout << "Contacts table created successfully.\n";
     }
 }
 
 int main() {
+    sqlite3 *db;
+    if (sqlite3_open("database.db", &db)) {
+        cerr << "Error opening database: " << sqlite3_errmsg(db) << endl;
+        return 1;
+    }
+    createContactsTable(db); 
+    Table table("", db);
     int choice;
-    Table table;
+
     ensureTablesDirectory();
     do {
         cout << "\nContact Management System\n";
@@ -369,17 +392,24 @@ int main() {
             continue; // Skip the rest of the loop iteration.
         }
 
-
         switch (choice) {
-            // ... [Existing cases]
+            case 1:
+                addContact(db);
+                break;
+            case 2:
+                viewContacts(db);
+                break;
+            case 3:
+                deleteContact(db);
+                break;
             case 4:
-                addTable();
+                addTable(db);
                 break;
             case 5:
-                openTable(table);
+                openTable(db, table);
                 break;
             case 6:
-                deleteTable();
+                deleteTable(db);
                 break;
             case 7:
                 cout << "Exiting...\n";
@@ -387,5 +417,6 @@ int main() {
             // ... [Rest of the switch cases]
         }
     } while (choice != 7);
+    sqlite3_close(db);
     return 0;
 }
