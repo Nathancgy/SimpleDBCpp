@@ -35,6 +35,10 @@ public:
             cerr << "SQL error in table_info: " << sqlite3_errmsg(db) << endl;
         }
     }
+    
+    const string& getName() const {
+        return tableName;
+    }
 
     // Function to add a row
     void addRow(const map<string, string>& rowData) {
@@ -154,7 +158,7 @@ public:
     // More functions (like deleteRow, updateRow, etc.) can be added here
 };
 
-void manageTable(Table& table);
+void manageTable(Table&, sqlite3*);
 
 void ensureTablesDirectory() {
     const fs::path tablesDir{"tables"};
@@ -231,7 +235,7 @@ void openTable(sqlite3 *db, Table& table) {
 
     table = Table(tableName, db);
     cout << "Opened table " << tableName << endl;
-    manageTable(table);
+    manageTable(table, db);
 }
 
 // Function to delete an existing table
@@ -250,7 +254,25 @@ void deleteTable(sqlite3 *db) {
     }
 }
 
-void manageTable(Table& table) {
+void addColumnToTable(sqlite3 *db, const string& tableName) {
+    string newColumnName;
+
+    cout << "Enter the name of the new column: ";
+    cin >> newColumnName;
+
+    // Assuming the new column is of type TEXT for simplicity
+    string sql = "ALTER TABLE " + tableName + " ADD COLUMN " + newColumnName + " TEXT;";
+
+    char *errMsg = nullptr;
+    if (sqlite3_exec(db, sql.c_str(), nullptr, 0, &errMsg) != SQLITE_OK) {
+        cerr << "SQL error: " << errMsg << endl;
+        sqlite3_free(errMsg);
+    } else {
+        cout << "Column " << newColumnName << " added to table " << tableName << " successfully.\n";
+    }
+}
+
+void manageTable(Table& table, sqlite3* db) {
     int choice;
     do {
         cout << "\nTable Management\n";
@@ -271,10 +293,7 @@ void manageTable(Table& table) {
 
         switch (choice) {
             case 1: {
-                // SQLite does not support adding columns to existing tables easily.
-                // If you need this functionality, consider designing your database schema to be more flexible
-                // or recreate the table with the new column.
-                cout << "Adding columns is not supported in this version.\n";
+                addColumnToTable(db, table.getName());
                 break;
             }
             case 2: {
