@@ -10,6 +10,8 @@ namespace fs = std::filesystem;
 
 using namespace std;
 
+// Table
+
 class Table {
     string tableName;
     sqlite3 *db;
@@ -379,6 +381,7 @@ void manageTable(Table& table, sqlite3* db) {
     } while (choice != 6);
 }
 
+// Contacts
 
 void addContact(sqlite3 *db) {
     string name, phone;
